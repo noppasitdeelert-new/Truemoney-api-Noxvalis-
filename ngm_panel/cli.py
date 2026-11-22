@@ -15,9 +15,10 @@ from .runner import execute
 from .scope_cli import run_scope
 from .scope_guard import ScopeGuard
 from .shell import Shell
+from .updater import run_update
 
 BUILTINS = {
-    "run", "help", "list", "exec", "scope", "catalog", "doctor", "version", "mobile",
+    "run", "help", "list", "exec", "scope", "catalog", "doctor", "update", "version", "mobile",
     "--help", "-h", "help", "--version", "-V", "-v",
 }
 
@@ -128,7 +129,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         return help_system.list_names(console, registry, rest[0] if rest else None)
     if head == "run":
         alt_screen = "--no-alt-screen" not in rest
-        return Shell(registry, guard, console, alt_screen=alt_screen).run()
+        force_alt_screen = "--alt-screen" in rest
+        return Shell(registry, guard, console, alt_screen=alt_screen,
+                     force_alt_screen=force_alt_screen).run()
     if head == "exec":
         if not rest:
             console.err("usage: ngm-panel exec <command> [args...]")
@@ -142,6 +145,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_catalog(console, registry, rest)
     if head == "doctor":
         return cmd_doctor(console, guard, registry)
+    if head == "update":
+        return run_update(console, rest)
 
     if head not in BUILTINS:
         return execute(registry, guard, console, head, rest, RunOptions())

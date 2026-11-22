@@ -36,6 +36,7 @@ QUICK_START = [
     ("ngm-panel osint.email you@example.com", "วิเคราะห์อีเมล + breach links"),
     ("ngm-panel help osint", "ดูตระกูล OSINT ทั้งหมด"),
     ("ngm-panel mobile.status", "ตรวจ Termux/Android บนมือถือ"),
+    ("ngm-panel update", "พิมพ์คำสั่งอัปเดต winget/pkg (เติม --run เพื่อรันจริง)"),
 ]
 
 

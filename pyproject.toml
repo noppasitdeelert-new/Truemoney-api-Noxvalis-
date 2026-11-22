@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ngm-panel"
-version = "1.1.0"
+version = "1.1.1"
 description = "Local-only terminal panel for Windows and Termux: scoped network/web diagnostics, OSINT research helpers, system inspection and controlled load testing."
 readme = "README.md"
 requires-python = ">=3.9"

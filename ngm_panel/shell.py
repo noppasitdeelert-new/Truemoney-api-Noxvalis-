@@ -27,11 +27,18 @@ def split_args(line: str) -> List[str]:
 class Shell:
     """Alternate-screen REPL: banner, prompt, local command execution."""
 
-    def __init__(self, registry: Registry, guard, console: Console, alt_screen: bool = True) -> None:
+    def __init__(self, registry: Registry, guard, console: Console, alt_screen: bool = True,
+                 force_alt_screen: bool = False) -> None:
+        from . import system
+
         self.registry = registry
         self.guard = guard
         self.console = console
-        self.alt_screen = alt_screen and console.is_tty
+        # Termux keeps a stale alt-screen buffer (screen appears frozen after a
+        # command), so phone users get the inline screen unless they ask for it.
+        self.alt_screen = (
+            alt_screen and console.is_tty and (force_alt_screen or not system.is_termux())
+        )
         self._readline = None
 
     # ------------------------------------------------------------- lifecycle
@@ -85,6 +92,7 @@ class Shell:
             )
         self.console.hr()
         self.console.blank()
+        self.console.flush()
 
     # -------------------------------------------------------------- dispatch
     def _dispatch(self, raw: str) -> bool:
@@ -119,6 +127,17 @@ class Shell:
         if name == "catalog":
             self._catalog(rest)
             return False
+        if name == "update":
+            from .updater import run_update
+
+            code = run_update(self.console, rest)
+            if code == 0 and "--run" in rest:
+                clear_screen()
+                self.console.banner(scope_path=self.guard.scope_path)
+                self.console.warn(
+                    "อัปเดตแล้ว — พิมพ์ exit แล้วเปิด ngm-panel ใหม่ หน้าจอจึงจะแสดงเวอร์ชันใหม่"
+                )
+            return False
 
         self.guard.auto_approve = False
         started = time.perf_counter()
@@ -131,6 +150,7 @@ class Shell:
         elapsed = (time.perf_counter() - started) * 1000
         if elapsed > 250:
             self.console.sub(f"  ⏱  {elapsed:.0f} ms")
+        self.console.flush()
         return False
 
     def _catalog(self, argv: List[str]) -> None:

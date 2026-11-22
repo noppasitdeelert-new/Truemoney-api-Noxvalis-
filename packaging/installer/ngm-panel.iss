@@ -4,7 +4,7 @@
 ; so `ngm-panel` works in cmd / PowerShell / Windows Terminal right after install.
 
 #define MyAppName "ngm-panel"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "NGM"
 #define MyAppExeName "ngm-panel.exe"
 #define MyAppUrl "https://github.com/NGM/ngm-panel"

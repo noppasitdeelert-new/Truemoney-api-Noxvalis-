@@ -107,6 +107,56 @@ def _fetch_json(ctx, url: str, max_body: int = 65536):
         return None, result
 
 
+def _vcard_name(entity) -> str:
+    """Return the first string value of an RDAP entity vCard (``fn``).
+
+    RDAP servers are inconsistent: ``vcardArray`` can be missing, ``None``,
+    empty, or hold properties shorter than four items. Every shape must be
+    tolerated instead of raising IndexError/TypeError.
+    """
+    if not isinstance(entity, dict):
+        return ""
+    vcard = entity.get("vcardArray")
+    if not isinstance(vcard, list) or len(vcard) < 2 or not isinstance(vcard[1], list):
+        return ""
+    for prop in vcard[1]:
+        if not isinstance(prop, list) or len(prop) < 4:
+            continue
+        if str(prop[0]).lower() != "fn":
+            continue
+        value = prop[3]
+        if isinstance(value, str):
+            return value.strip()
+        if isinstance(value, list) and value and isinstance(value[0], str):
+            return value[0].strip()
+    return ""
+
+
+def _rdap_registrar(payload) -> str:
+    if not isinstance(payload, dict):
+        return "-"
+    names = []
+    for entity in payload.get("entities") or []:
+        if not isinstance(entity, dict):
+            continue
+        if "registrar" not in (entity.get("roles") or []):
+            continue
+        name = _vcard_name(entity)
+        if name:
+            names.append(name)
+    return ", ".join(names) or "-"
+
+
+def _hash_stream(path: str) -> Dict[str, str]:
+    """Hash the whole file in chunks — a head-only read gives wrong digests."""
+    digests = {"md5": hashlib.md5(), "sha1": hashlib.sha1(), "sha256": hashlib.sha256()}
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            for digest in digests.values():
+                digest.update(chunk)
+    return {name: digest.hexdigest() for name, digest in digests.items()}
+
+
 def _digest(algorithm: str, payload: bytes) -> str:
     try:
         func = getattr(hashlib, algorithm)
@@ -391,21 +441,26 @@ def cmd_domain(ctx, argv: List[str]) -> int:
             ctx.console.heading("RDAP response")
             if payload is None:
                 ctx.console.err(f"RDAP ล้มเหลว: {result.error or result.status}")
+            elif not isinstance(payload, dict):
+                ctx.console.err("RDAP ตอบกลับรูปแบบไม่ปกติ (ไม่ใช่ object)")
             else:
-                events = {event.get("eventAction"): event.get("eventDate") for event in payload.get("events", [])}
+                events = {
+                    event.get("eventAction"): event.get("eventDate")
+                    for event in (payload.get("events") or [])
+                    if isinstance(event, dict)
+                }
                 ctx.console.keyvalue(
                     [
                         ("Handle", payload.get("handle", "-")),
-                        ("Status", ", ".join(payload.get("status", [])) or "-"),
-                        ("Registrar", ", ".join(
-                            entity.get("vcardArray", [None, []])[1][1][3]
-                            for entity in payload.get("entities", [])
-                            if entity.get("roles") == ["registrar"] and len(entity.get("vcardArray", [])) == 2
-                            and len(entity["vcardArray"][1]) > 1) or "-"),
+                        ("Status", ", ".join(payload.get("status") or []) or "-"),
+                        ("Registrar", _rdap_registrar(payload)),
                         ("Registered", events.get("registration", "-")),
                         ("Expires", events.get("expiration", "-")),
                         ("Updated", events.get("last changed", "-")),
-                        ("Nameservers", ", ".join(server.get("ldhName", "") for server in payload.get("nameservers", [])) or "-"),
+                        ("Nameservers", ", ".join(
+                            server.get("ldhName", "")
+                            for server in (payload.get("nameservers") or [])
+                            if isinstance(server, dict)) or "-"),
                     ]
                 )
                 ctx.print_json(payload)
@@ -1119,6 +1174,7 @@ def cmd_file(ctx, argv: List[str]) -> int:
     with open(path, "rb") as handle:
         payload = handle.read(min(stat.st_size, 8 * 1024 * 1024))
     label, mime = _detect_type(payload)
+    digests = _hash_stream(path)
     ctx.console.heading(f"File · {os.path.basename(path)}")
     ctx.console.keyvalue(
         [
@@ -1128,15 +1184,15 @@ def cmd_file(ctx, argv: List[str]) -> int:
             ("MIME (guess)", mime),
             ("Modified", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_mtime))),
             ("Entropy", f"{_entropy(payload[:65536]):.2f} bits/byte"),
-            ("MD5", hashlib.md5(payload).hexdigest()),
-            ("SHA1", hashlib.sha1(payload).hexdigest()),
-            ("SHA256", hashlib.sha256(payload).hexdigest()),
+            ("MD5", digests["md5"]),
+            ("SHA1", digests["sha1"]),
+            ("SHA256", digests["sha256"]),
         ]
     )
     if _entropy(payload[:65536]) > 7.5:
         ctx.console.warn("entropy สูง — ไฟล์อาจถูกบีบอัด/เข้ารหัส/แพ็ก")
     ctx.print_json({"path": os.path.abspath(path), "size": stat.st_size, "type": label, "mime": mime,
-                    "md5": hashlib.md5(payload).hexdigest(), "sha256": hashlib.sha256(payload).hexdigest()})
+                    "md5": digests["md5"], "sha1": digests["sha1"], "sha256": digests["sha256"]})
     return 0
 
 

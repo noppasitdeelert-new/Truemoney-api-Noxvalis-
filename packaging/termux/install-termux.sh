@@ -58,6 +58,7 @@ cat <<'EOF'
 Done. Useful commands:
 
   ngm-panel doctor
+  ngm-panel update            # ดูคำสั่ง pkg/git/pip สำหรับอัปเดต
   ngm-panel mobile.doctor
   ngm-panel mobile.status
   ngm-panel help osint

@@ -4,7 +4,7 @@
 > ไม่มีเซิร์ฟเวอร์กลาง ไม่มี backend ออนไลน์ ไม่มีการรับส่งคำสั่งหรือผลลัพธ์ออกนอกเครื่อง
 > ทุกคำสั่งทำงานและประมวลผลภายในโปรเซส `ngm-panel` บนเครื่องของคุณเอง
 
-[![tests](https://img.shields.io/badge/tests-62%20passed-brightgreen)](#การทดสอบ)
+[![tests](https://img.shields.io/badge/tests-72%20passed-brightgreen)](#การทดสอบ)
 [![commands](https://img.shields.io/badge/catalog-5101%20commands-blue)](#7-catalog-5000-คำสั่ง-และวิธีขยาย)
 [![osint](https://img.shields.io/badge/OSINT-3652%20commands-purple)](#54-osint-3652-คำสั่ง)
 [![termux](https://img.shields.io/badge/platform-Windows%20%7C%20Termux-lightgrey)](#24-termux--android-มือถือ)
@@ -161,7 +161,10 @@ termux-wake-unlock
 
 - `mobile.*` ต้องมี **Termux:API** (แอปจาก F-Droid) + `pkg install termux-api`
   คำสั่งจะบอกวิธีติดตั้งเองถ้ายังไม่มี และไม่ crash
-- ถ้าคีย์บอร์ดบังหน้าจอ ให้ใช้ `ngm-panel run --no-alt-screen` หรือหันแนวนอน
+- `ngm-panel run` บน Termux ใช้หน้าจอปกติ (inline) โดยอัตโนมัติ เพราะ alternate screen
+  ของ Termux มักค้างไม่รีเฟรชหลังรันคำสั่ง — ถ้าต้องการ alt-screen ให้เติม `--alt-screen`
+- อัปเดตเวอร์ชันบนมือถือ: `ngm-panel update` (พิมพ์คำสั่ง pkg/git/pip) หรือ
+  `ngm-panel update --run` (รันให้เลย) แล้วพิมพ์ `exit` เปิด `ngm-panel` ใหม่
 - history ใช้ `readline` ของ Termux ได้ตามปกติ
 - `osint.*` สร้างลิงก์/วิเคราะห์ในเครื่อง — แตะนิ้วค้างที่ลิงก์เพื่อคัดลอกไปเปิดเบราว์เซอร์
 - คำสั่ง Windows-only (`sys.cim`, `proc.service`, `sys.adapters`) จะแจ้งว่าใช้ได้บน Windows เท่านั้น
@@ -244,7 +247,7 @@ ngm-panel/
 │     ├─ sec.py            sec.scope / sec.audit / sec.tls-grade
 │     ├─ mobile.py         mobile.status / mobile.doctor / mobile.pkg / mobile.storage / Termux:API
 │     └─ osint.py          osint.username/email/domain/ip/hash/jwt/exif/phone/dork/… (hand-written)
-├─ tests/test_core.py      offline test suite (62 tests, ไม่ต้องใช้เน็ต)
+├─ tests/test_core.py      offline test suite (72 tests, ไม่ต้องใช้เน็ต)
 ├─ packaging/
 │  ├─ ngm-panel.spec       PyInstaller spec (onefile, console, ฝัง data/)
 │  ├─ build.ps1            build + test + smoke test (+ `-Installer`)
@@ -253,7 +256,7 @@ ngm-panel/
 │  ├─ termux/install-termux.sh   ติดตั้งบน Termux + สร้าง launcher
 │  ├─ termux/ngm-panel          launcher shell สำหรับ $PREFIX/bin
 │  ├─ winget/manifests/n/NGM/NgmPanel/1.0.0/*.yaml   manifest 3 ไฟล์ (เวอร์ชันเก่า)
-│  └─ winget/manifests/n/NGM/NgmPanel/1.1.0/*.yaml   manifest 3 ไฟล์ (เวอร์ชันปัจจุบัน)
+│  └─ winget/manifests/n/NGM/NgmPanel/1.1.1/*.yaml   manifest 3 ไฟล์ (เวอร์ชันปัจจุบัน)
 ├─ pyproject.toml          packaging + console entry point
 ├─ requirements-dev.txt    PyInstaller (runtime ไม่มี dependency)
 ├─ LICENSE                  MIT
@@ -644,7 +647,7 @@ ngm-panel run
 
 ## 10. เผยแพร่ผ่าน winget
 
-Manifest อยู่ที่ `packaging\winget\manifests\n\NGM\NgmPanel\1.1.0\`
+Manifest อยู่ที่ `packaging\winget\manifests\n\NGM\NgmPanel\1.1.1\`
 (`NGM.NgmPanel.yaml`, `.installer.yaml`, `.locale.en-US.yaml`, schema 1.6.0, `InstallerType: inno`)
 
 ### 10.1 คำสั่ง winget ที่ผู้ใช้ปลายทางจะใช้
@@ -663,10 +666,10 @@ winget uninstall --id NGM.NgmPanel -e
 
 ```powershell
 # ตรวจ schema
-winget validate --manifest packaging\winget\manifests\n\NGM\NgmPanel\1.1.0
+winget validate --manifest packaging\winget\manifests\n\NGM\NgmPanel\1.1.1
 
 # ติดตั้งจาก manifest ในเครื่อง (ไม่ต้องรอ publish)
-winget install --manifest packaging\winget\manifests\n\NGM\NgmPanel\1.1.0
+winget install --manifest packaging\winget\manifests\n\NGM\NgmPanel\1.1.1
 
 # ถอน
 winget uninstall --id NGM.NgmPanel -e
@@ -678,7 +681,7 @@ winget uninstall --id NGM.NgmPanel -e
 2. `InstallerSha256` → ค่าจริง:
 
    ```powershell
-   Get-FileHash .\dist\ngm-panel-1.1.0-setup.exe -Algorithm SHA256
+   Get-FileHash .\dist\ngm-panel-1.1.1-setup.exe -Algorithm SHA256
    ```
 
 3. `ProductCode` → ต้องตรงกับ `AppId` ใน `ngm-panel.iss`
@@ -689,10 +692,10 @@ winget uninstall --id NGM.NgmPanel -e
 
 ```powershell
 # วิธีที่แนะนำ: wingetcreate (ติดตั้ง: winget install Microsoft.WingetCreate)
-wingetcreate submit --token <GITHUB_TOKEN> packaging\winget\manifests\n\NGM\NgmPanel\1.1.0
+wingetcreate submit --token <GITHUB_TOKEN> packaging\winget\manifests\n\NGM\NgmPanel\1.1.1
 
 # หรือ fork microsoft/winget-pkgs แล้วคัดลอกโฟลเดอร์นี้เข้า:
-# manifests/n/NGM/NgmPanel/1.1.0/  →  เปิด PR
+# manifests/n/NGM/NgmPanel/1.1.1/  →  เปิด PR
 ```
 
 อัปเดตเวอร์ชันครั้งถัดไป:
@@ -702,6 +705,22 @@ wingetcreate update NGM.NgmPanel --version 1.1.1 `
   --urls https://github.com/NGM/ngm-panel/releases/download/v1.1.1/ngm-panel-1.1.1-setup.exe `
   --submit --token <GITHUB_TOKEN>
 ```
+
+### 10.5 อัปเดตเวอร์ชันใหม่ตลอดอายุการใช้งาน
+
+คำสั่งเดียวใช้ได้ทั้ง Windows และ Termux — ตัวโปรแกรมตรวจแพลตฟอร์มเอง:
+
+```bash
+ngm-panel update           # พิมพ์คำสั่ง winget / pkg / git / pip ที่ต้องใช้
+ngm-panel update --run     # รันคำสั่งเหล่านั้นให้ทันที (ต้องมี winget/pkg ตามแพลตฟอร์ม)
+ngm-panel update --json    # ผลลัพธ์แบบ JSON สำหรับสคริปต์
+```
+
+บน Windows จะเรียก `winget source update` แล้ว `winget upgrade --id NGM.NgmPanel -e --silent`
+ส่วน Termux จะเรียก `pkg update -y && pkg upgrade -y` ตามด้วย `git pull --ff-only` +
+`pip install -e .` (ถ้าเป็น git checkout) หรือ `pip install --upgrade ngm-panel`
+
+หลังอัปเดตให้ปิด panel เดิม (`exit`) แล้วเปิดใหม่ หน้าจอจึงจะโหลดโค้ดเวอร์ชันล่าสุด
 
 > หมายเหตุ: `winget install NGM.NgmPanel` จะใช้ได้จริงหลัง manifest ถูก merge เข้า repository กลาง
 > ก่อนหน้านั้นใช้ `winget install --manifest …` ตามหัวข้อ 10.2
@@ -722,7 +741,7 @@ help ทุกโหมด, flag parser, console helpers, host/URL normalization
 Termux detection + narrow (stacked) tables, mobile commands, และ OSINT engine
 (hash/identify/JWT/encode/phone/domain/username/dork/IP/geo/crypto/PNG metadata/tool/source/breach/UA/GUID/MAC)
 
-ผลที่รันจริงใน repo นี้: **62 tests — OK**
+ผลที่รันจริงใน repo นี้: **72 tests — OK**
 
 ### 11.2 ตรวจ catalog
 

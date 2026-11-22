@@ -339,6 +339,88 @@ class TermuxTests(unittest.TestCase):
         self.assertIn("cell", output)
 
 
+class UpdateTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def _toggle(self, key: str, value: str):
+        previous = os.environ.get(key)
+        os.environ[key] = value
+
+        def restore() -> None:
+            if previous is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous
+
+        self.addCleanup(restore)
+
+    def test_update_prints_winget_and_pkg_commands(self) -> None:
+        from ngm_panel import __version__, updater
+
+        console = Console(color=False, stream=io.StringIO())
+        code = updater.run_update(console, [])
+        output = console.stream.getvalue()
+        self.assertEqual(code, 0)
+        self.assertIn(__version__, output)
+        self.assertIn("winget upgrade --id NGM.NgmPanel -e", output)
+        self.assertIn("pkg update -y && pkg upgrade -y", output)
+        self.assertIn("bash packaging/termux/install-termux.sh", output)
+        self.assertIn("ยังไม่รันอะไร", output)
+
+    def test_update_plan_uses_winget_on_windows(self) -> None:
+        from unittest import mock
+
+        from ngm_panel import updater
+
+        with mock.patch("ngm_panel.updater.system.is_windows", return_value=True):
+            steps = updater.plan()
+            self.assertEqual(steps[0][1][:2], ["winget", "source"])
+            self.assertIn("upgrade", steps[1][1])
+            self.assertEqual(updater.method(), "winget")
+
+    def test_update_plan_uses_pkg_and_pip_on_termux(self) -> None:
+        from ngm_panel import updater
+
+        self._toggle("TERMUX_VERSION", "0.118.1")
+        self._toggle("PREFIX", "/data/data/com.termux/files/usr")
+        steps = updater.plan()
+        commands = [command[0] for _, command in steps]
+        self.assertEqual(commands[:2], ["pkg", "pkg"])
+        self.assertTrue(any("pip" in command for _, command in steps))
+
+    def test_update_is_a_cli_builtin(self) -> None:
+        from ngm_panel import cli
+
+        self.assertIn("update", cli.BUILTINS)
+
+
+class ShellScreenTests(unittest.TestCase):
+    def test_termux_defaults_to_inline_screen(self) -> None:
+        from ngm_panel.shell import Shell
+
+        class TtyStream(io.StringIO):
+            def isatty(self) -> bool:
+                return True
+
+        previous = os.environ.get("TERMUX_VERSION")
+        os.environ["TERMUX_VERSION"] = "0.118.1"
+        self.addCleanup(
+            lambda: os.environ.pop("TERMUX_VERSION", None)
+            if previous is None
+            else os.environ.__setitem__("TERMUX_VERSION", previous)
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            registry = build_registry()
+            guard = _guard(temp)
+            shell = Shell(registry, guard, Console(color=False, stream=TtyStream()))
+            self.assertFalse(shell.alt_screen)
+            forced = Shell(registry, guard, Console(color=False, stream=TtyStream()),
+                           force_alt_screen=True)
+            self.assertTrue(forced.alt_screen)
+
+
 class MobileCommandTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -521,6 +603,90 @@ class OsintTests(unittest.TestCase):
         code, output = self.run_cmd("osint.mac", ["00:1A:2B:3C:4D:5E"])
         self.assertEqual(code, 0)
         self.assertIn("00:1A:2B", output)
+
+    def test_file_hash_covers_files_larger_than_8mb(self) -> None:
+        import hashlib as _hashlib
+
+        path = os.path.join(self.tmp.name, "big.bin")
+        blob = b"ngm-panel\n" * (900 * 1024)  # ~9.4 MB: above the old 8 MB head read
+        with open(path, "wb") as handle:
+            handle.write(blob)
+        code, output = self.run_cmd("osint.file", [path])
+        self.assertEqual(code, 0)
+        self.assertIn(_hashlib.md5(blob).hexdigest(), output)
+        self.assertIn(_hashlib.sha1(blob).hexdigest(), output)
+        self.assertIn(_hashlib.sha256(blob).hexdigest(), output)
+
+    def test_domain_rdap_tolerates_missing_vcard(self) -> None:
+        from unittest import mock
+
+        payload = {
+            "handle": "2336799_DOMAIN_COM-VRSN",
+            "events": [{"eventAction": "registration", "eventDate": "1995-08-14T04:00:00Z"}],
+            "entities": [
+                {"roles": ["registrar"], "vcardArray": []},
+                {"roles": ["registrar"], "vcardArray": None},
+                {"roles": ["registrar"], "vcardArray": ["vcard", []]},
+                {"roles": ["registrar"], "vcardArray": ["vcard", [["version", {}, "text", "4.0"]]]},
+                {"roles": ["registrar"], "vcardArray": ["vcard", ["fn"]]},
+                {"roles": ["registrar"], "vcardArray": ["vcard", [["fn", {}, "text", "Example Registrar"]]]},
+                {"roles": ["registrant"], "vcardArray": ["vcard", [["fn", {}, "text", "Owner"]]]},
+                "not-a-dict",
+            ],
+        }
+        guard = ScopeGuard(
+            targets=[Target("rdap.org", ports=[443])],
+            scope_path=os.path.join(self.tmp.name, "rdap-scope.json"),
+        )
+        with mock.patch("ngm_panel.commands.osint._fetch_json", return_value=(payload, None)):
+            code, output = _run(self.registry, guard, "osint.domain", ["example.com", "--rdap"])
+        self.assertEqual(code, 0, output)
+        self.assertIn("RDAP response", output)
+        self.assertIn("Example Registrar", output)
+
+    def test_domain_rdap_survives_empty_entities(self) -> None:
+        from unittest import mock
+
+        guard = ScopeGuard(
+            targets=[Target("rdap.org", ports=[443])],
+            scope_path=os.path.join(self.tmp.name, "rdap-scope.json"),
+        )
+        for payload in ({"entities": None}, {"entities": [{}]}, {"events": None}):
+            with mock.patch("ngm_panel.commands.osint._fetch_json", return_value=(payload, None)):
+                code, output = _run(self.registry, guard, "osint.domain", ["example.com", "--rdap"])
+            self.assertEqual(code, 0, output)
+            self.assertIn("Registrar", output)
+
+    def test_email_url_dork_and_tld(self) -> None:
+        code, output = self.run_cmd("osint.email", ["analyst@example.org"])
+        self.assertEqual(code, 0)
+        self.assertIn("Gravatar", output)
+        self.assertIn("haveibeenpwned.com", output)
+        self.assertIn("MX lookup ข้าม", output)
+        code, output = self.run_cmd("osint.url", ["https://example.org/login?next=%2Fhome&debug=1"])
+        self.assertEqual(code, 0)
+        self.assertIn("Query parameters", output)
+        self.assertIn("debug", output)
+        code, output = self.run_cmd("osint.dork", ["site:example.org filetype:pdf"])
+        self.assertEqual(code, 0)
+        self.assertIn("google.com/search", output)
+        code, output = self.run_cmd("osint.tld", ["th"])
+        self.assertEqual(code, 0)
+        self.assertIn("Thailand", output)
+
+    def test_asn_wayback_chain_and_links(self) -> None:
+        code, output = self.run_cmd("osint.asn", ["AS15169"])
+        self.assertEqual(code, 0)
+        self.assertIn("bgpview.io/asn/15169", output)
+        code, output = self.run_cmd("osint.wayback", ["example.org"])
+        self.assertEqual(code, 0)
+        self.assertIn("web.archive.org", output)
+        code, output = self.run_cmd("osint.chain", ["1BoatSLRHtKNngkdXEeobR76b53LETtpyT"])
+        self.assertEqual(code, 0)
+        self.assertIn("blockstream.info", output)
+        code, output = self.run_cmd("osint.links", ["tester"])
+        self.assertEqual(code, 0)
+        self.assertIn("github.com/tester", output)
 
     def test_every_osint_family_has_working_handler(self) -> None:
         families = [family for family in self.registry.families() if family.startswith("osint.")]
