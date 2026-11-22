@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: NGM.NgmPanel
+PackageVersion: 1.1.0
+PackageLocale: en-US
+Publisher: NGM
+PublisherUrl: https://github.com/NGM/ngm-panel
+PublisherSupportUrl: https://github.com/NGM/ngm-panel/issues
+PackageName: ngm-panel
+PackageUrl: https://github.com/NGM/ngm-panel
+License: MIT
+LicenseUrl: https://github.com/NGM/ngm-panel/blob/main/LICENSE
+Copyright: Copyright (c) 2026 NGM
+ShortDescription: Local-only terminal panel for Windows and Termux with 5,100+ network, system and OSINT commands.
+Description: >-
+  ngm-panel runs 100% locally inside its own process on your machine and also
+  runs inside Termux on Android. It provides a full-screen terminal panel with
+  5,100+ commands: DNS/IP lookups, TCP port checks, web/TLS inspection,
+  controlled L7/L4 load tests, Windows system/process inspection, file
+  utilities, Termux/mobile helpers (termux-api, storage, packages, notifications)
+  and 3,600+ OSINT commands (username/email/domain/IP/dork/metadata reference
+  with offline analysis). Every outbound command is checked against an
+  authorized-scope file with rate, concurrency, timeout and request caps.
+Moniker: ngm-panel
+Tags:
+  - cli
+  - network
+  - diagnostics
+  - security
+  - osint
+  - termux
+  - android
+  - terminal
+  - windows
+  - utilities
+ReleaseNotesUrl: https://github.com/NGM/ngm-panel/releases/tag/v1.1.0
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

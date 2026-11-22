@@ -1,0 +1,3 @@
+# Runtime dependencies: none (standard library only).
+# Development / packaging dependencies:
+pyinstaller>=6.0

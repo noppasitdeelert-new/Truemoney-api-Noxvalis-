@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "note": "Authorized scope for ngm-panel. Add ONLY hosts/domains you own or have explicit written permission to test. Every external command is checked against this file.",
+  "limits": {
+    "max_rps": 5.0,
+    "max_concurrency": 20,
+    "timeout_seconds": 5.0,
+    "request_cap": 2000,
+    "max_duration_seconds": 120
+  },
+  "allow_private_networks": true,
+  "require_confirmation": true,
+  "targets": [
+    { "host": "localhost", "note": "this machine" },
+    { "host": "127.0.0.1", "note": "loopback" },
+    { "host": "::1", "note": "loopback IPv6" },
+    { "host": "example.com", "ports": [80, 443], "note": "IANA reserved documentation domain" },
+    { "host": "example.org", "ports": [80, 443], "note": "IANA reserved documentation domain" }
+  ]
+}

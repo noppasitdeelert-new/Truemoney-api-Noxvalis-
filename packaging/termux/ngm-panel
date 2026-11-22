@@ -1,0 +1,4 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Minimal launcher for Termux: install with
+#   install -m 755 packaging/termux/ngm-panel "$PREFIX/bin/ngm-panel"
+exec python -m ngm_panel "$@"
