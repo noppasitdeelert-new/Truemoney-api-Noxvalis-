@@ -395,6 +395,112 @@ class UpdateTests(unittest.TestCase):
 
         self.assertIn("update", cli.BUILTINS)
 
+    def test_update_plan_clones_repo_when_there_is_no_checkout(self) -> None:
+        from unittest import mock
+
+        from ngm_panel import updater
+
+        target = os.path.join(self.tmp.name, "ngm-panel")
+        self._toggle("TERMUX_VERSION", "0.118.1")
+        self._toggle("PREFIX", "/data/data/com.termux/files/usr")
+        with mock.patch("ngm_panel.updater.is_git_checkout", return_value=False), mock.patch(
+            "ngm_panel.updater.clone_dir", return_value=target
+        ):
+            steps = updater.plan()
+        clone = dict(steps)["git clone"]
+        self.assertEqual(clone[:4], ["git", "clone", "--depth", "1"])
+        self.assertEqual(clone[4], updater.REPO_URL)
+        self.assertEqual(clone[5], target)
+        install = dict(steps)["pip install -e"]
+        self.assertEqual(install[-1], target)
+        self.assertIn("python", dict(steps)["pkg install"])
+
+    def test_update_check_reports_tool_readiness(self) -> None:
+        from ngm_panel import updater
+
+        console = Console(color=False, stream=io.StringIO())
+        code = updater.run_update(console, ["--check"])
+        output = console.stream.getvalue()
+        self.assertEqual(code, 0)
+        self.assertIn("ตรวจความพร้อม", output)
+        payload = json.loads(output[output.index('{\n  "installed"') :])
+        self.assertEqual(payload["platform"], system.platform_tag())
+        self.assertTrue(payload["tools"])
+        self.assertTrue(all(entry["found"] for entry in payload["tools"]))
+        self.assertIn("checkout", output)
+
+    def test_update_skips_clone_into_existing_directory(self) -> None:
+        from unittest import mock
+
+        from ngm_panel import updater
+
+        occupied = os.path.join(self.tmp.name, "occupied")
+        os.makedirs(occupied, exist_ok=True)
+        problem = updater._step_problem(
+            "git clone", ["git", "clone", "--depth", "1", updater.REPO_URL, occupied]
+        )
+        self.assertIn("ไม่ใช่ git checkout", problem)
+        with mock.patch("ngm_panel.updater._tool", return_value=("git", "/usr/bin/git")):
+            self.assertEqual(
+                updater._step_problem(
+                    "git clone",
+                    ["git", "clone", "--depth", "1", updater.REPO_URL, os.path.join(self.tmp.name, "fresh")],
+                ),
+                "",
+            )
+        with mock.patch("ngm_panel.updater._tool", return_value=("pkg", "")):
+            self.assertIn("ไม่พบ pkg", updater._step_problem("pkg update", ["pkg", "update", "-y"]))
+
+    def test_winget_manifests_match_project_and_repo(self) -> None:
+        import subprocess
+        import sys
+
+        from ngm_panel import __version__, updater
+
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        manifests = os.path.join(root, "packaging", "winget", "manifests", "n", "NGM", "NgmPanel")
+        current = os.path.join(manifests, __version__)
+        with open(os.path.join(current, "NGM.NgmPanel.installer.yaml"), encoding="utf-8") as handle:
+            installer = handle.read()
+        with open(os.path.join(current, "NGM.NgmPanel.yaml"), encoding="utf-8") as handle:
+            version_yaml = handle.read()
+        self.assertIn(f"InstallerUrl: {updater.REPO_URL}/releases/download/v{__version__}/", installer)
+        self.assertIn('ProductCode: "{8F3C2B7A-5D14-4E6B-9C2F-A1D4E7B39C50}"', installer)
+        self.assertIn(f"PackageVersion: {__version__}", version_yaml)
+
+        result = subprocess.run(
+            [sys.executable, os.path.join(root, "packaging", "winget", "render_manifest.py"), "--check", manifests],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_ci_and_release_workflows_cover_tests_catalog_and_winget(self) -> None:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(root, ".github", "workflows", "ci.yml"), encoding="utf-8") as handle:
+            ci = handle.read()
+        self.assertIn("branches: [main]", ci)
+        self.assertIn("python -m unittest discover -s tests", ci)
+        self.assertIn("python -m ngm_panel catalog --check", ci)
+        self.assertIn('"3.9"', ci)
+        self.assertIn("render_manifest.py --check", ci)
+        self.assertIn("bash -n packaging/termux/install-termux.sh", ci)
+
+        with open(os.path.join(root, ".github", "workflows", "release.yml"), encoding="utf-8") as handle:
+            release = handle.read()
+        self.assertIn("Get-FileHash", release)
+        self.assertIn("render_manifest.py --version", release)
+        self.assertIn("--require-sha", release)
+
+    def test_termux_installer_supports_update(self) -> None:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(root, "packaging", "termux", "install-termux.sh"), encoding="utf-8") as handle:
+            script = handle.read()
+        self.assertIn("--update", script)
+        self.assertIn("pkg install -y python git", script)
+        self.assertIn("git -C \"$ROOT\" pull --ff-only", script)
+        self.assertIn("python -m pip install -e .", script)
+
 
 class ShellScreenTests(unittest.TestCase):
     def test_termux_defaults_to_inline_screen(self) -> None:

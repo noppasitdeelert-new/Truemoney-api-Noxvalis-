@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NO_COLOR: "1"
+  PYTHONIOENCODING: utf-8
+  NGM_PANEL_HOME: ${{ github.workspace }}/.ci-home
+
+jobs:
+  test:
+    name: tests · Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # pyproject.toml declares requires-python = ">=3.9": test the floor and
+        # the current releases. No runtime dependencies are installed.
+        python: ["3.9", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install package (editable, zero runtime deps)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Offline test suite
+        run: python -m unittest discover -s tests -v
+
+      - name: Catalog check (5,000+ commands)
+        run: python -m ngm_panel catalog --check
+
+      - name: Byte-compile
+        run: python -m compileall -q ngm_panel tests
+
+  packaging:
+    name: packaging (winget + Termux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate winget manifests
+        run: python packaging/winget/render_manifest.py --check packaging/winget/manifests/n/NGM/NgmPanel
+
+      - name: Termux installer syntax
+        run: bash -n packaging/termux/install-termux.sh
+
+      - name: Shellcheck Termux installer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck -S warning packaging/termux/install-termux.sh

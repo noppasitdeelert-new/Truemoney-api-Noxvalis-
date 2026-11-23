@@ -1,5 +1,4 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
-# แทนที่ InstallerUrl / InstallerSha256 / ProductCode ด้วยค่าจริงของ release ของคุณก่อน submit
 PackageIdentifier: NGM.NgmPanel
 PackageVersion: 1.1.0
 InstallerLocale: en-US
@@ -12,10 +11,10 @@ InstallModes:
 UpgradeBehavior: install
 Commands:
   - ngm-panel
-ReleaseDate: 2026-11-22
+ReleaseDate: 2026-11-23
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/NGM/ngm-panel/releases/download/v1.1.0/ngm-panel-1.1.0-setup.exe
+    InstallerUrl: https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-/releases/download/v1.1.0/ngm-panel-1.1.0-setup.exe
     InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
     ProductCode: "{8F3C2B7A-5D14-4E6B-9C2F-A1D4E7B39C50}"
     AppsAndFeaturesEntries:

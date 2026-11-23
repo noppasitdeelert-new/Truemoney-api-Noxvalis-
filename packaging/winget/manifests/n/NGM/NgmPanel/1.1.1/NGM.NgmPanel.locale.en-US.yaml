@@ -3,12 +3,12 @@ PackageIdentifier: NGM.NgmPanel
 PackageVersion: 1.1.1
 PackageLocale: en-US
 Publisher: NGM
-PublisherUrl: https://github.com/NGM/ngm-panel
-PublisherSupportUrl: https://github.com/NGM/ngm-panel/issues
+PublisherUrl: https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-
+PublisherSupportUrl: https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-/issues
 PackageName: ngm-panel
-PackageUrl: https://github.com/NGM/ngm-panel
+PackageUrl: https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-
 License: MIT
-LicenseUrl: https://github.com/NGM/ngm-panel/blob/main/LICENSE
+LicenseUrl: https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-/blob/main/LICENSE
 Copyright: Copyright (c) 2026 NGM
 ShortDescription: Local-only terminal panel for Windows and Termux with 5,100+ network, system and OSINT commands.
 Description: >-
@@ -32,6 +32,6 @@ Tags:
   - terminal
   - windows
   - utilities
-ReleaseNotesUrl: https://github.com/NGM/ngm-panel/releases/tag/v1.1.1
+ReleaseNotesUrl: https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-/releases/tag/v1.1.1
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0

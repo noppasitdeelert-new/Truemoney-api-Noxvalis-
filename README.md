@@ -4,7 +4,8 @@
 > ไม่มีเซิร์ฟเวอร์กลาง ไม่มี backend ออนไลน์ ไม่มีการรับส่งคำสั่งหรือผลลัพธ์ออกนอกเครื่อง
 > ทุกคำสั่งทำงานและประมวลผลภายในโปรเซส `ngm-panel` บนเครื่องของคุณเอง
 
-[![tests](https://img.shields.io/badge/tests-72%20passed-brightgreen)](#การทดสอบ)
+[![ci](https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-/actions/workflows/ci.yml/badge.svg)](https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-78%20passed-brightgreen)](#12-การทดสอบ)
 [![commands](https://img.shields.io/badge/catalog-5101%20commands-blue)](#7-catalog-5000-คำสั่ง-และวิธีขยาย)
 [![osint](https://img.shields.io/badge/OSINT-3652%20commands-purple)](#54-osint-3652-คำสั่ง)
 [![termux](https://img.shields.io/badge/platform-Windows%20%7C%20Termux-lightgrey)](#24-termux--android-มือถือ)
@@ -24,8 +25,9 @@
 8. [แพ็กเป็น .exe ด้วย PyInstaller](#8-แพ็กเป็น-exe-ด้วย-pyinstaller)
 9. [Installer (Inno Setup) + PATH อัตโนมัติ](#9-installer-inno-setup--path-อัตโนมัติ)
 10. [เผยแพร่ผ่าน winget](#10-เผยแพร่ผ่าน-winget)
-11. [การทดสอบ](#11-การทดสอบ)
-12. [ความปลอดภัยและขอบเขตความรับผิดชอบ](#12-ความปลอดภัยและขอบเขตความรับผิดชอบ)
+11. [CI/CD ด้วย GitHub Actions](#11-cicd-ด้วย-github-actions)
+12. [การทดสอบ](#12-การทดสอบ)
+13. [ความปลอดภัยและขอบเขตความรับผิดชอบ](#13-ความปลอดภัยและขอบเขตความรับผิดชอบ)
 
 ---
 
@@ -163,8 +165,9 @@ termux-wake-unlock
   คำสั่งจะบอกวิธีติดตั้งเองถ้ายังไม่มี และไม่ crash
 - `ngm-panel run` บน Termux ใช้หน้าจอปกติ (inline) โดยอัตโนมัติ เพราะ alternate screen
   ของ Termux มักค้างไม่รีเฟรชหลังรันคำสั่ง — ถ้าต้องการ alt-screen ให้เติม `--alt-screen`
-- อัปเดตเวอร์ชันบนมือถือ: `ngm-panel update` (พิมพ์คำสั่ง pkg/git/pip) หรือ
-  `ngm-panel update --run` (รันให้เลย) แล้วพิมพ์ `exit` เปิด `ngm-panel` ใหม่
+- อัปเดตเวอร์ชันบนมือถือ: `ngm-panel update --check` (ดูว่ามี pkg/git/pip ครบไหม),
+  `ngm-panel update` (พิมพ์คำสั่ง pkg/git/pip) หรือ `ngm-panel update --run` (รันให้เลย)
+  แล้วพิมพ์ `exit` เปิด `ngm-panel` ใหม่ — ถ้ายังไม่มี checkout สคริปต์จะ clone ไปที่ `~/ngm-panel` ให้
 - history ใช้ `readline` ของ Termux ได้ตามปกติ
 - `osint.*` สร้างลิงก์/วิเคราะห์ในเครื่อง — แตะนิ้วค้างที่ลิงก์เพื่อคัดลอกไปเปิดเบราว์เซอร์
 - คำสั่ง Windows-only (`sys.cim`, `proc.service`, `sys.adapters`) จะแจ้งว่าใช้ได้บน Windows เท่านั้น
@@ -247,7 +250,10 @@ ngm-panel/
 │     ├─ sec.py            sec.scope / sec.audit / sec.tls-grade
 │     ├─ mobile.py         mobile.status / mobile.doctor / mobile.pkg / mobile.storage / Termux:API
 │     └─ osint.py          osint.username/email/domain/ip/hash/jwt/exif/phone/dork/… (hand-written)
-├─ tests/test_core.py      offline test suite (72 tests, ไม่ต้องใช้เน็ต)
+├─ .github/workflows/
+│  ├─ ci.yml              push เข้า main → unittest + catalog --check (Python 3.9/3.12/3.13)
+│  └─ release.yml         tag v* → build .exe + installer, คำนวณ SHA-256, สร้าง release + winget manifest
+├─ tests/test_core.py      offline test suite (78 tests, ไม่ต้องใช้เน็ต)
 ├─ packaging/
 │  ├─ ngm-panel.spec       PyInstaller spec (onefile, console, ฝัง data/)
 │  ├─ build.ps1            build + test + smoke test (+ `-Installer`)
@@ -255,7 +261,9 @@ ngm-panel/
 │  ├─ installer/ngm-panel.iss   Inno Setup 6 + เติม PATH ผู้ใช้อัตโนมัติ
 │  ├─ termux/install-termux.sh   ติดตั้งบน Termux + สร้าง launcher
 │  ├─ termux/ngm-panel          launcher shell สำหรับ $PREFIX/bin
+│  ├─ winget/render_manifest.py   สร้าง/ตรวจ manifest (URL + SHA-256 จริง, stdlib)
 │  ├─ winget/manifests/n/NGM/NgmPanel/1.0.0/*.yaml   manifest 3 ไฟล์ (เวอร์ชันเก่า)
+│  ├─ winget/manifests/n/NGM/NgmPanel/1.1.0/*.yaml   manifest 3 ไฟล์ (เวอร์ชันเก่า)
 │  └─ winget/manifests/n/NGM/NgmPanel/1.1.1/*.yaml   manifest 3 ไฟล์ (เวอร์ชันปัจจุบัน)
 ├─ pyproject.toml          packaging + console entry point
 ├─ requirements-dev.txt    PyInstaller (runtime ไม่มี dependency)
@@ -625,7 +633,7 @@ if ($userPath -notlike "*$dir*") {
 ```powershell
 winget install --id JRSoftware.InnoSetup -e     # ติดตั้ง Inno Setup 6
 powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Installer
-# ผลลัพธ์: dist\ngm-panel-1.0.0-setup.exe
+# ผลลัพธ์: dist\ngm-panel-1.1.1-setup.exe
 ```
 
 สิ่งที่ installer ทำ:
@@ -649,6 +657,8 @@ ngm-panel run
 
 Manifest อยู่ที่ `packaging\winget\manifests\n\NGM\NgmPanel\1.1.1\`
 (`NGM.NgmPanel.yaml`, `.installer.yaml`, `.locale.en-US.yaml`, schema 1.6.0, `InstallerType: inno`)
+และสร้างใหม่ได้ด้วย `packaging/winget/render_manifest.py` (stdlib) — URL ชี้
+`https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-/releases/download/v<ver>/`
 
 ### 10.1 คำสั่ง winget ที่ผู้ใช้ปลายทางจะใช้
 
@@ -675,18 +685,26 @@ winget install --manifest packaging\winget\manifests\n\NGM\NgmPanel\1.1.1
 winget uninstall --id NGM.NgmPanel -e
 ```
 
-### 10.3 ก่อน submit ต้องแก้ค่าจริง 3 จุด
+### 10.3 สร้าง manifest จาก installer จริง (ไม่ต้องแก้มือ)
 
-1. `NGM.NgmPanel.installer.yaml` → `InstallerUrl` ให้ชี้ release asset จริง
-2. `InstallerSha256` → ค่าจริง:
+```powershell
+python packaging\winget\render_manifest.py `
+  --version 1.1.1 `
+  --sha256 (Get-FileHash .\dist\ngm-panel-1.1.1-setup.exe -Algorithm SHA256).Hash `
+  --out packaging\winget\manifests\n\NGM\NgmPanel\1.1.1
 
-   ```powershell
-   Get-FileHash .\dist\ngm-panel-1.1.1-setup.exe -Algorithm SHA256
-   ```
+# ตรวจ URL / SHA-256 / ProductCode / version ทั้งชุด (--require-sha = ห้าม placeholder)
+python packaging\winget\render_manifest.py --check packaging\winget\manifests\n\NGM\NgmPanel --require-sha
+```
 
-3. `ProductCode` → ต้องตรงกับ `AppId` ใน `ngm-panel.iss`
-   (ปัจจุบัน `{8F3C2B7A-5D14-4E6B-9C2F-A1D4E7B39C50}`)
-   และเปลี่ยน `Publisher`/URLs ให้เป็นของคุณ
+สคริปต์ตรวจให้อัตโนมัติว่า `ProductCode` ตรงกับ `AppId` ใน `ngm-panel.iss`
+(`{8F3C2B7A-5D14-4E6B-9C2F-A1D4E7B39C50}`), URL อยู่ใน repo นี้, และ version
+ใน `pyproject.toml` = version ของ manifest ใหม่สุด = `#define MyAppVersion`
+
+> manifest ที่ commit ไว้มี `InstallerSha256` เป็น `000…0` (placeholder)
+> เพราะ hash จริงเกิดหลัง build — `release.yml` จะ render ใหม่ทุกครั้งที่ push tag
+> ถ้าต้องติดตั้งทันทีโดยไม่รอ winget-pkgs ให้ใช้
+> `winget install --manifest <โฟลเดอร์ที่ render แล้ว>` หรือติดตั้งจาก release asset
 
 ### 10.4 submit เข้า winget-pkgs
 
@@ -702,7 +720,7 @@ wingetcreate submit --token <GITHUB_TOKEN> packaging\winget\manifests\n\NGM\NgmP
 
 ```powershell
 wingetcreate update NGM.NgmPanel --version 1.1.1 `
-  --urls https://github.com/NGM/ngm-panel/releases/download/v1.1.1/ngm-panel-1.1.1-setup.exe `
+  --urls https://github.com/noppasitdeelert-new/Truemoney-api-Noxvalis-/releases/download/v1.1.1/ngm-panel-1.1.1-setup.exe `
   --submit --token <GITHUB_TOKEN>
 ```
 
@@ -711,14 +729,23 @@ wingetcreate update NGM.NgmPanel --version 1.1.1 `
 คำสั่งเดียวใช้ได้ทั้ง Windows และ Termux — ตัวโปรแกรมตรวจแพลตฟอร์มเอง:
 
 ```bash
+ngm-panel update --check   # ตรวจว่ามี winget / pkg / git / pip ครบไหม
 ngm-panel update           # พิมพ์คำสั่ง winget / pkg / git / pip ที่ต้องใช้
 ngm-panel update --run     # รันคำสั่งเหล่านั้นให้ทันที (ต้องมี winget/pkg ตามแพลตฟอร์ม)
 ngm-panel update --json    # ผลลัพธ์แบบ JSON สำหรับสคริปต์
 ```
 
 บน Windows จะเรียก `winget source update` แล้ว `winget upgrade --id NGM.NgmPanel -e --silent`
-ส่วน Termux จะเรียก `pkg update -y && pkg upgrade -y` ตามด้วย `git pull --ff-only` +
-`pip install -e .` (ถ้าเป็น git checkout) หรือ `pip install --upgrade ngm-panel`
+ส่วน Termux จะเรียก `pkg update -y && pkg upgrade -y && pkg install -y python git`
+ตามด้วย `git pull --ff-only` + `pip install -e .`
+ถ้าเครื่องยังไม่มี checkout จะ `git clone` repo นี้ไปที่ `~/ngm-panel` แล้วติดตั้งให้
+(แพ็กเกจไม่ได้อยู่บน PyPI จึงไม่ใช้ `pip install --upgrade ngm-panel`)
+
+อัปเดตด้วยสคริปต์ Termux ก็ได้:
+
+```bash
+bash packaging/termux/install-termux.sh --update
+```
 
 หลังอัปเดตให้ปิด panel เดิม (`exit`) แล้วเปิดใหม่ หน้าจอจึงจะโหลดโค้ดเวอร์ชันล่าสุด
 
@@ -727,9 +754,63 @@ ngm-panel update --json    # ผลลัพธ์แบบ JSON สำหรั
 
 ---
 
-## 11. การทดสอบ
+## 11. CI/CD ด้วย GitHub Actions
 
-### 11.1 Offline test suite (ไม่ต้องใช้เน็ต)
+### 11.1 CI — ทุก push เข้า `main`
+
+`.github/workflows/ci.yml` รันบน `ubuntu-latest` ด้วย Python **3.9, 3.12, 3.13**
+(ตรงกับ `requires-python = ">=3.9"` ใน `pyproject.toml`):
+
+| ขั้น | คำสั่ง |
+|---|---|
+| ติดตั้ง (ไม่มี runtime dependency) | `python -m pip install -e .` |
+| เทสต์ออฟไลน์ | `python -m unittest discover -s tests -v` |
+| ตรวจ catalog | `python -m ngm_panel catalog --check` |
+| byte-compile | `python -m compileall -q ngm_panel tests` |
+
+job ที่สอง `packaging` ตรวจ manifest winget ด้วย
+`python packaging/winget/render_manifest.py --check packaging/winget/manifests/n/NGM/NgmPanel`
+และตรวจสคริปต์ Termux ด้วย `bash -n` + `shellcheck -S warning`
+
+ถ้า CI แดงที่ขั้น catalog แปลว่ามีคำสั่งซ้ำ/ฟิลด์ไม่ครบใน `ngm_panel/commands/` —
+รัน `python -m ngm_panel catalog --check` ในเครื่องจะเห็นคำสั่งที่ผิด
+
+### 11.2 Release — tag `v*`
+
+```bash
+git tag v1.1.1
+git push origin v1.1.1
+```
+
+`.github/workflows/release.yml` (windows-latest) ทำตามลำดับ:
+
+1. ตรวจว่า tag = `version` ใน `pyproject.toml` = `#define MyAppVersion` ใน `ngm-panel.iss`
+2. รันเทสต์ + `catalog --check`
+3. build `dist\ngm-panel.exe` (PyInstaller) และ `ngm-panel-<ver>-setup.exe` (Inno Setup 6 จาก choco)
+4. คำนวณ SHA-256 ของ installer จริง แล้วเรียก
+   `python packaging/winget/render_manifest.py --version <ver> --sha256 <hash> --out winget-out`
+   ตามด้วย `--check winget-out --require-sha`
+5. `winget validate` ถ้า runner มี winget CLI (ถ้าไม่มี จะใช้การตรวจโครงสร้างจากสคริปต์แทน)
+6. สร้าง GitHub Release พร้อม `ngm-panel-<ver>-setup.exe` และ
+   `ngm-panel-<ver>-winget-manifests.zip` (manifest ที่ URL/SHA-256 ถูกต้องแล้ว)
+
+หลัง release: submit manifest ที่ได้เข้า `microsoft/winget-pkgs` ตามหัวข้อ 10.4
+หรือให้ผู้ใช้ติดตั้งตรงจาก release ด้วย `winget install --manifest <โฟลเดอร์ที่แตก zip>`
+
+### 11.3 รันงานเดียวกันในเครื่อง (ไม่ต้องรอ CI)
+
+```bash
+python -m unittest discover -s tests -v      # เทสต์
+python -m ngm_panel catalog --check          # catalog
+python packaging/winget/render_manifest.py --check packaging/winget/manifests/n/NGM/NgmPanel
+bash -n packaging/termux/install-termux.sh   # ตรวจ syntax สคริปต์ Termux
+```
+
+---
+
+## 12. การทดสอบ
+
+### 12.1 Offline test suite (ไม่ต้องใช้เน็ต)
 
 ```powershell
 python -m unittest discover -s tests -v
@@ -741,16 +822,16 @@ help ทุกโหมด, flag parser, console helpers, host/URL normalization
 Termux detection + narrow (stacked) tables, mobile commands, และ OSINT engine
 (hash/identify/JWT/encode/phone/domain/username/dork/IP/geo/crypto/PNG metadata/tool/source/breach/UA/GUID/MAC)
 
-ผลที่รันจริงใน repo นี้: **72 tests — OK**
+ผลที่รันจริงใน repo นี้: **78 tests — OK**
 
-### 11.2 ตรวจ catalog
+### 12.2 ตรวจ catalog
 
 ```powershell
 python -m ngm_panel catalog --check   # exit 0 = ผ่าน
 python -m ngm_panel doctor
 ```
 
-### 11.3 ทดสอบกับเซิร์ฟเวอร์ในเครื่อง (ไม่แตะระบบคนอื่น)
+### 12.3 ทดสอบกับเซิร์ฟเวอร์ในเครื่อง (ไม่แตะระบบคนอื่น)
 
 ```powershell
 # เปิด HTTP server ท้องถิ่น
@@ -766,7 +847,7 @@ ngm-panel web.test-flood http://127.0.0.1:8765 -n 4 -d 5 -r 8
 # กด Ctrl+C ระหว่างเทสต์ → ต้องได้ partial summary และกลับ prompt
 ```
 
-### 11.4 ทดสอบว่า guard ทำงาน
+### 12.4 ทดสอบว่า guard ทำงาน
 
 ```powershell
 ngm-panel net.tcp example.net 80          # ต้อง exit code 3 + แนะนำให้ scope add
@@ -775,18 +856,20 @@ ngm-panel net.tcp example.net 80          # ผ่าน guard
 ngm-panel net.tcp example.net 22          # ต้องถูกปฏิเสธ (port ไม่อยู่ใน scope)
 ```
 
-### 11.5 Checklist ก่อนปล่อย release
+### 12.5 Checklist ก่อนปล่อย release
 
 - [ ] `python -m unittest discover -s tests` ผ่าน
 - [ ] `python -m ngm_panel catalog --check` ผ่าน
 - [ ] `packaging\build.ps1` ผ่าน และ `dist\ngm-panel.exe doctor` ทำงาน
 - [ ] `dist\ngm-panel.exe run` เข้า/ออก alternate screen ถูกต้อง
 - [ ] ติดตั้ง installer → เปิด terminal ใหม่ → `ngm-panel doctor` ใช้ได้
+- [ ] `python packaging/winget/render_manifest.py --check … --require-sha` ผ่าน
 - [ ] `winget validate --manifest …` ผ่าน และ SHA256 ตรงกับไฟล์จริง
+- [ ] push tag `v<version>` แล้ว `release` workflow สร้าง GitHub Release ครบ
 
 ---
 
-## 12. ความปลอดภัยและขอบเขตความรับผิดชอบ
+## 13. ความปลอดภัยและขอบเขตความรับผิดชอบ
 
 ### OSINT
 

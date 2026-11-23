@@ -1,0 +1,142 @@
+name: release
+
+# Builds the Windows installer, publishes a GitHub Release and renders the
+# winget manifests with the real download URL + SHA-256 of that installer.
+#
+#   git tag v1.1.1 && git push origin v1.1.1
+#
+# Artifacts: ngm-panel-<version>-setup.exe, ngm-panel-<version>-winget-manifests.zip
+# The rendered manifest set is what you submit to microsoft/winget-pkgs
+# (wingetcreate submit ...), or install straight from the release with
+#   winget install --manifest <unzipped folder>
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (must match pyproject.toml and the tag, e.g. 1.1.1)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  windows-installer:
+    name: windows installer + winget manifests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.version }}" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::version '$version' is not numeric X.Y.Z"
+            exit 1
+          fi
+          declared=$(python -c "import re,pathlib;print(re.search(r'^version = \"([^\"]+)\"', pathlib.Path('pyproject.toml').read_text(), re.M).group(1))")
+          iss=$(python -c "import re,pathlib;print(re.search(r'#define MyAppVersion \"([^\"]+)\"', pathlib.Path('packaging/installer/ngm-panel.iss').read_text()).group(1))")
+          echo "pyproject=$declared iss=$iss tag=$version"
+          for source in "$declared" "$iss"; do
+            if [ "$source" != "$version" ]; then
+              echo "::error::version mismatch: $version (tag) vs $source (pyproject/iss)"
+              exit 1
+            fi
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pyinstaller
+
+      - name: Tests + catalog check
+        env:
+          NO_COLOR: "1"
+          NGM_PANEL_HOME: ${{ runner.temp }}\ngm-panel-home
+        run: |
+          python -m unittest discover -s tests -v
+          python -m ngm_panel catalog --check
+
+      - name: Install Inno Setup 6
+        run: choco install innosetup --no-progress -y
+
+      - name: Build ngm-panel.exe
+        run: python -m PyInstaller packaging\ngm-panel.spec --noconfirm --clean
+
+      - name: Build installer
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\installer\ngm-panel.iss
+          if (-not (Test-Path "dist\ngm-panel-${{ steps.meta.outputs.version }}-setup.exe")) { throw "installer not built" }
+          & "dist\ngm-panel.exe" --version
+          & "dist\ngm-panel.exe" catalog --check
+
+      - name: Render winget manifests with the real SHA-256
+        shell: pwsh
+        run: |
+          $version = "${{ steps.meta.outputs.version }}"
+          $setup = "dist\ngm-panel-$version-setup.exe"
+          $sha = (Get-FileHash $setup -Algorithm SHA256).Hash
+          Write-Host "sha256=$sha"
+          $manifestRoot = "winget-out\n\NGM\NgmPanel"
+          python packaging/winget/render_manifest.py --version $version --sha256 $sha --out "$manifestRoot\$version"
+          if ($LASTEXITCODE -ne 0) { throw "render_manifest failed" }
+          python packaging/winget/render_manifest.py --check $manifestRoot --require-sha
+          if ($LASTEXITCODE -ne 0) { throw "manifest validation failed" }
+          Compress-Archive -Path "$manifestRoot\$version\*" -DestinationPath "dist\ngm-panel-$version-winget-manifests.zip" -Force
+
+      - name: winget validate (when the CLI is available)
+        shell: pwsh
+        run: |
+          if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget validate --manifest "winget-out\n\NGM\NgmPanel\${{ steps.meta.outputs.version }}"
+            if ($LASTEXITCODE -ne 0) { throw "winget validate failed" }
+          } else {
+            Write-Host "winget CLI not installed on this runner; structural validation already passed."
+          }
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.meta.outputs.version }}
+          name: ngm-panel ${{ steps.meta.outputs.version }}
+          generate_release_notes: true
+          body: |
+            ## ngm-panel ${{ steps.meta.outputs.version }}
+
+            Windows installer (Inno Setup, user scope, adds itself to `PATH`) and the
+            winget manifest set rendered with the SHA-256 of the attached installer.
+
+            ```powershell
+            winget install --id NGM.NgmPanel -e
+            # or straight from this release:
+            winget install --manifest .\ngm-panel-${{ steps.meta.outputs.version }}-winget-manifests.zip
+            ```
+
+            Termux: `pkg update -y && pkg upgrade -y`, then `ngm-panel update --run`.
+          files: |
+            dist/ngm-panel-${{ steps.meta.outputs.version }}-setup.exe
+            dist/ngm-panel-${{ steps.meta.outputs.version }}-winget-manifests.zip
+
+      - name: Upload manifest set
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngm-panel-${{ steps.meta.outputs.version }}-winget-manifests
+          path: dist/ngm-panel-${{ steps.meta.outputs.version }}-winget-manifests.zip
+          if-no-files-found: error
