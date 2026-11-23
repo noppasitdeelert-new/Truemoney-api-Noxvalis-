@@ -423,11 +423,17 @@ class UpdateTests(unittest.TestCase):
         output = console.stream.getvalue()
         self.assertEqual(code, 0)
         self.assertIn("ตรวจความพร้อม", output)
-        payload = json.loads(output[output.index('{\n  "installed"') :])
+        self.assertIn("checkout", output)
+        self.assertNotIn('"installed"', output)
+
+        # --json must emit the payload alone so scripts can pipe it into json.load
+        console = Console(color=False, stream=io.StringIO())
+        self.assertEqual(updater.run_update(console, ["--check", "--json"]), 0)
+        payload = json.loads(console.stream.getvalue())
         self.assertEqual(payload["platform"], system.platform_tag())
         self.assertTrue(payload["tools"])
         self.assertTrue(all(entry["found"] for entry in payload["tools"]))
-        self.assertIn("checkout", output)
+        self.assertIn("steps", payload)
 
     def test_update_skips_clone_into_existing_directory(self) -> None:
         from unittest import mock

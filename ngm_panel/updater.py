@@ -136,47 +136,51 @@ def run_update(console, argv: List[str]) -> int:
     root = project_root()
     steps = plan()
     checkout = is_git_checkout(root)
-    console.heading("Update · ngm-panel")
-    console.keyvalue(
-        [
-            ("Installed", __version__),
-            ("Platform", system.platform_tag()),
-            ("Method", method()),
-            ("Repo", "checkout " + root if checkout else "clone → " + clone_dir()),
-        ]
-    )
+    as_json = bool(flags.get("json"))
 
-    if flags.get("check"):
-        console.heading("ตรวจความพร้อมของเครื่องมือ")
-        ready = True
-        for label, tool, found in check(steps):
-            if found:
-                console.ok(tool)
+    if not as_json:
+        console.heading("Update · ngm-panel")
+        console.keyvalue(
+            [
+                ("Installed", __version__),
+                ("Platform", system.platform_tag()),
+                ("Method", method()),
+                ("Repo", "checkout " + root if checkout else "clone → " + clone_dir()),
+            ]
+        )
+
+        if flags.get("check"):
+            console.heading("ตรวจความพร้อมของเครื่องมือ")
+            ready = True
+            for label, tool, found in check(steps):
+                if found:
+                    console.ok(tool)
+                else:
+                    ready = False
+                    console.err(f"{tool} — ต้องมีสำหรับขั้น {label}")
+            if ready:
+                console.sub("ครบทุกเครื่องมือ: เติม --run เพื่ออัปเดตทันที")
             else:
-                ready = False
-                console.err(f"{tool} — ต้องมีสำหรับขั้น {label}")
-        if ready:
-            console.sub("ครบทุกเครื่องมือ: เติม --run เพื่ออัปเดตทันที")
-        else:
-            console.sub("ติดตั้งเครื่องมือที่ขาดก่อน (winget / pkg / git / python -m pip)")
+                console.sub("ติดตั้งเครื่องมือที่ขาดก่อน (winget / pkg / git / python -m pip)")
 
-    console.heading("คำสั่งอัปเดตเครื่องนี้")
-    for label, command in steps:
-        console.line("  " + console.cyan(label.ljust(18)) + "  " + _quote(command))
-    console.heading("คำสั่งติดตั้ง/อัปเดตด้วยมือ")
-    console.line("  winget upgrade --id " + WINGET_ID + " -e")
-    console.line("  winget install --id " + WINGET_ID + " -e --silent")
-    console.line("  winget uninstall --id " + WINGET_ID + " -e")
-    console.line("  winget install --manifest packaging\\winget\\manifests\\n\\NGM\\NgmPanel\\" + __version__)
-    console.line("  pkg update -y && pkg upgrade -y && pkg install -y python git")
-    console.line("  bash packaging/termux/install-termux.sh")
-    console.line("  git clone " + REPO_URL + " ~/" + PACKAGE_NAME)
-    console.line("  python -m pip install -e .")
-    console.line("  " + WINGET_MANIFEST_URL)
+        console.heading("คำสั่งอัปเดตเครื่องนี้")
+        for label, command in steps:
+            console.line("  " + console.cyan(label.ljust(18)) + "  " + _quote(command))
+        console.heading("คำสั่งติดตั้ง/อัปเดตด้วยมือ")
+        console.line("  winget upgrade --id " + WINGET_ID + " -e")
+        console.line("  winget install --id " + WINGET_ID + " -e --silent")
+        console.line("  winget uninstall --id " + WINGET_ID + " -e")
+        console.line("  winget install --manifest packaging\\winget\\manifests\\n\\NGM\\NgmPanel\\" + __version__)
+        console.line("  pkg update -y && pkg upgrade -y && pkg install -y python git")
+        console.line("  bash packaging/termux/install-termux.sh")
+        console.line("  git clone " + REPO_URL + " ~/" + PACKAGE_NAME)
+        console.line("  python -m pip install -e .")
+        console.line("  " + WINGET_MANIFEST_URL)
 
     failures = 0
     if flags.get("run"):
-        console.heading("Running")
+        if not as_json:
+            console.heading("Running")
         for label, command in steps:
             problem = _step_problem(label, command)
             if problem:
@@ -198,24 +202,25 @@ def run_update(console, argv: List[str]) -> int:
                 console.ok(label)
         if failures:
             console.warn(f"มี {failures} ขั้นที่ล้มเหลว — ตรวจ output ด้านบนก่อนลองใหม่")
-        else:
+        elif not as_json:
             console.ok("อัปเดตครบทุกขั้น — เปิด ngm-panel ใหม่เพื่อใช้เวอร์ชันล่าสุด")
-    else:
+    elif not as_json:
         console.sub("ยังไม่รันอะไร: เติม --run เพื่ออัปเดตทันที หรือคัดลอกคำสั่งด้านบนไปรันเอง")
 
-    console.json_out(
-        {
-            "installed": __version__,
-            "platform": system.platform_tag(),
-            "method": method(),
-            "repo": root,
-            "checkout": checkout,
-            "clone_dir": clone_dir(),
-            "steps": [{"label": label, "command": _quote(command)} for label, command in steps],
-            "tools": [{"tool": tool, "found": found, "step": label} for label, tool, found in check(steps)],
-            "ran": bool(flags.get("run")),
-            "failures": failures,
-        }
-    )
+    if as_json:
+        console.json_out(
+            {
+                "installed": __version__,
+                "platform": system.platform_tag(),
+                "method": method(),
+                "repo": root,
+                "checkout": checkout,
+                "clone_dir": clone_dir(),
+                "steps": [{"label": label, "command": _quote(command)} for label, command in steps],
+                "tools": [{"tool": tool, "found": found, "step": label} for label, tool, found in check(steps)],
+                "ran": bool(flags.get("run")),
+                "failures": failures,
+            }
+        )
     console.flush()
     return 0 if failures == 0 else 1
